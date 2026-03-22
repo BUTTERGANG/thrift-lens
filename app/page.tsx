@@ -1,65 +1,104 @@
-import Image from "next/image";
+import { Scanner } from '@/components/Scanner'
+import { StoreCheckIn } from '@/components/StoreCheckIn'
+import { IconSearch, IconBarChart, IconDollar, IconClipboard, IconCamera, IconClock } from '@/components/icons'
+import Link from 'next/link'
+import type { ReactNode } from 'react'
+
+const FEATURES: { icon: ReactNode; label: string }[] = [
+  { icon: <IconSearch size={12} strokeWidth={2} />, label: 'AI Identify' },
+  { icon: <IconBarChart size={12} strokeWidth={2} />, label: 'Live Comps' },
+  { icon: <IconDollar size={12} strokeWidth={2} />, label: 'Profit Score' },
+  { icon: <IconClipboard size={12} strokeWidth={2} />, label: 'Sell Tips' },
+]
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen text-white">
+      <div className="max-w-md mx-auto px-4 pt-10 pb-28">
+
+        {/* Header */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2.5 mb-4 hover:scale-105 transition-transform duration-300">
+            <IconSearch size={28} strokeWidth={2.5} className="text-amber-400" />
+            <h1 className="text-3xl font-black tracking-tight">
+              <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                Thrift
+              </span>
+              <span className="text-white">Lens</span>
+            </h1>
+          </div>
+          <p className="text-slate-400 text-sm font-medium">
+            Snap any item. Know its worth in 20 seconds.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Feature pills */}
+        <div className="flex justify-center gap-2.5 flex-wrap mb-10">
+          {FEATURES.map((f, index) => (
+            <span
+              key={f.label}
+              className="flex items-center gap-1.5 bg-white/5 backdrop-blur-md border border-white/10 text-slate-300 text-xs px-3.5 py-1.5 rounded-full hover:border-amber-500/40 hover:bg-white/10 hover:text-white transition-all duration-300 shadow-sm"
+              style={{ animation: `fade-in 0.5s ease-out ${index * 0.1}s both` }}
+            >
+              {f.icon}
+              {f.label}
+            </span>
+          ))}
         </div>
-      </main>
-    </div>
-  );
+
+
+        {/* Store check-in */}
+        <StoreCheckIn />
+
+        {/* Scanner */}
+        <Scanner />
+
+        {/* How it works (Moved below scanner) */}
+        <div className="mt-8 bg-white/5 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg">
+          <h2 className="text-slate-200 text-sm font-semibold mb-4 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            How it works
+          </h2>
+          <ol className="space-y-3.5 text-slate-400 text-sm">
+            {[
+              'Take a photo or upload from your library.',
+              'AI identifies the item and pulls live comps.',
+              'Get a market range, profit estimate, and tips.',
+            ].map((text, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 shadow-inner">
+                  {i + 1}
+                </span>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="text-slate-500 text-xs mt-4 pt-4 border-t border-slate-700/50">
+            Privacy: no account required, and images are not stored.
+          </p>
+        </div>
+
+        {/* Divider + trust line */}
+        <div className="mt-8 pt-6 border-t border-slate-800 text-center">
+          <p className="text-slate-600 text-xs">
+            Claude AI · eBay market data · No signup required
+          </p>
+        </div>
+
+      </div>
+
+      {/* Bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-800/80 flex" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <Link href="/" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-amber-400 relative">
+          <span className="absolute top-2 w-1 h-1 rounded-full bg-amber-400" />
+          <IconCamera size={20} strokeWidth={1.75} />
+          <span className="text-xs font-semibold">Scan</span>
+        </Link>
+        <Link href="/history" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-slate-500">
+          <IconClock size={20} strokeWidth={1.75} />
+          <span className="text-xs">History</span>
+        </Link>
+      </nav>
+    </main>
+  )
 }
