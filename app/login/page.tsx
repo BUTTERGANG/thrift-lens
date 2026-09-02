@@ -11,6 +11,10 @@ export default function LoginPage() {
   const [signupState, signupAction, signupPending] = useActionState<AuthState, FormData>(signup, undefined)
   const [mounted, setMounted] = useState(false)
 
+  // Render the form only after hydration so password-manager DOM injection
+  // can't cause a server/client mismatch. This is the canonical "have we
+  // mounted" flag — the one setState-in-effect the rule can't model.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), [])
 
   const state = mode === 'login' ? loginState : signupState

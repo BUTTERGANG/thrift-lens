@@ -26,13 +26,24 @@ function checkRateLimitMemory(
   return { allowed: true, retryAfterMs: 0 }
 }
 
-export function getClientIp(headers: Headers): string {
+export function getClientIp(headers: { get(name: string): string | null }): string {
   const forwarded = headers.get('x-forwarded-for')
   if (forwarded) {
     return forwarded.split(',')[0].trim()
   }
   const realIp = headers.get('x-real-ip')
   return realIp?.trim() || 'unknown'
+}
+
+// The rate_limits table keeps one row per key forever otherwise. Sweep rows that
+// haven't been touched in a day on ~1% of calls — cheap, and keeps it bounded.
+async function sweepStaleRateLimits() {
+  if (Math.random() > 0.01) return
+  try {
+    await sql`DELETE FROM rate_limits WHERE updated_at < NOW() - INTERVAL '1 day'`
+  } catch (err) {
+    console.error('Rate limit sweep error:', err)
+  }
 }
 
 export async function checkRateLimit(
@@ -66,6 +77,7 @@ export async function checkRateLimit(
     const activeWindowMs = activeWindow ? new Date(activeWindow).getTime() : windowStartMs
     const allowed = count <= maxRequests
     const retryAfterMs = allowed ? 0 : Math.max(0, activeWindowMs + windowMs - now)
+    void sweepStaleRateLimits()
     return { allowed, retryAfterMs }
   } catch (err) {
     console.error('Rate limit DB error:', err)

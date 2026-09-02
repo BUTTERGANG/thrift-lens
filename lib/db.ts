@@ -23,16 +23,8 @@ export default sql
 
 export async function runMigrations() {
   await sql`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `
-
-  await sql`
     CREATE TABLE IF NOT EXISTS scans (
       id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      session_id          UUID NOT NULL,
       image_url           TEXT,
       item_identified     TEXT NOT NULL,
       brand               TEXT,
@@ -56,9 +48,10 @@ export async function runMigrations() {
     ADD COLUMN IF NOT EXISTS profit_estimate_high INTEGER
   `
 
-  await sql`
-    CREATE INDEX IF NOT EXISTS scans_session_id_idx ON scans (session_id, created_at DESC)
-  `
+  // Auth is now JWT-only (user_id). The pre-auth per-device sessions table and
+  // the scans.session_id column it fed are dead — drop them where they exist.
+  await sql`ALTER TABLE scans DROP COLUMN IF EXISTS session_id`
+  await sql`DROP TABLE IF EXISTS sessions`
 
   await sql`
     ALTER TABLE scans

@@ -24,11 +24,15 @@ export function StoreCheckIn() {
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lon: number } | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
 
+  // Hydrate from localStorage on mount (browser-only store, unavailable during
+  // SSR — the first client render must match the server's "idle" output).
   useEffect(() => {
     const existing = getCheckIn()
     if (existing) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setCheckinState(existing)
       setMode('checked_in')
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [])
 

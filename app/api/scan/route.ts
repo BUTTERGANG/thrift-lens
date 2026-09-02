@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createHash } from 'crypto'
 import { identifyItem, analyzeItem } from '@/lib/claude'
 import { fetchEbayComps } from '@/lib/ebay'
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { checkRateLimit } from '@/lib/rateLimit'
 import { requireSession } from '@/lib/auth'
 import { looksLikeHeic, heicToJpeg } from '@/lib/heic'
 import sql from '@/lib/db'
@@ -23,10 +23,11 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limit: 5 scans per IP per minute
-    const ip = getClientIp(request.headers)
+    const session = await requireSession()
 
-    const { allowed, retryAfterMs } = await checkRateLimit(`scan:${ip}`, 5, 60_000)
+    // Rate limit: 5 scans per user per minute. Keyed on user id, not IP —
+    // Replit's proxy collapses client IPs, and scans require a session anyway.
+    const { allowed, retryAfterMs } = await checkRateLimit(`scan:${session.userId}`, 5, 60_000)
     if (!allowed) {
       return Response.json(
         { error: 'Too many requests. Please wait a moment and try again.' },
@@ -36,8 +37,6 @@ export async function POST(request: NextRequest) {
         }
       )
     }
-
-    const session = await requireSession()
 
     const formData = await request.formData()
     const imageFile = formData.get('image') as File | null
@@ -79,6 +78,12 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid file type. Please upload a JPEG, PNG, or WebP image.' },
         { status: 415 }
       )
+    }
+
+    // Anthropic Vision only accepts image/jpeg (not the "image/jpg" some browsers
+    // and Windows systems emit). Normalize before the API call below.
+    if (mediaType === 'image/jpg') {
+      mediaType = 'image/jpeg'
     }
 
     const imageBase64 = Buffer.from(bytes).toString('base64')
@@ -136,13 +141,12 @@ export async function POST(request: NextRequest) {
     try {
       const inserted = await sql`
         INSERT INTO scans (
-          session_id, user_id, item_identified, brand, condition, deal_score,
+          user_id, item_identified, brand, condition, deal_score,
           market_value_low, market_value_high, profit_estimate,
           profit_estimate_low, profit_estimate_high,
           identification_json, analysis_json, ebay_comps_json,
           store_name, latitude, longitude
         ) VALUES (
-          ${session.userId}::uuid,
           ${session.userId}::uuid,
           ${identification.item_name},
           ${identification.brand},

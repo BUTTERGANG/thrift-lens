@@ -39,7 +39,6 @@ export interface EbayComp {
 
 export interface ScanRecord {
   id: string
-  session_id: string
   item_identified: string
   brand: string | null
   condition: string | null

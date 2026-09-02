@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Not application code — Replit/agent tooling and design-doc scratch space.
+    ".local/**",
+    ".agents/**",
   ]),
 ]);
 

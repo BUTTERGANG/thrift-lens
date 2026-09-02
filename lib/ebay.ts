@@ -45,10 +45,11 @@ async function getAccessToken(): Promise<string> {
     return tokenCache.token
   }
 
-  const clientId = process.env.EBAY_CLIENT_ID
-  const clientSecret = process.env.EBAY_CLIENT_SECRET
+  // eBay's dev portal labels these "App ID" and "Cert ID"; accept those names too.
+  const clientId = process.env.EBAY_CLIENT_ID ?? process.env.APP_ID
+  const clientSecret = process.env.EBAY_CLIENT_SECRET ?? process.env.CERT_ID
   if (!clientId || !clientSecret) {
-    throw new Error('EBAY_CLIENT_ID and EBAY_CLIENT_SECRET must be set')
+    throw new Error('EBAY_CLIENT_ID/APP_ID and EBAY_CLIENT_SECRET/CERT_ID must be set')
   }
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')

@@ -1,9 +1,11 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import sql from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { createSession, deleteSession } from '@/lib/auth'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 
 export type AuthState = {
   error?: string
@@ -12,7 +14,21 @@ export type AuthState = {
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/
 const MIN_PASSWORD_LENGTH = 8
 
+const RATE_LIMITED = 'Too many attempts. Please wait a few minutes and try again.'
+
+/** Throttle auth attempts per client IP to slow credential stuffing. */
+async function authRateLimit(action: 'login' | 'signup'): Promise<boolean> {
+  const ip = getClientIp(await headers())
+  const { allowed } =
+    action === 'login'
+      ? await checkRateLimit(`login:${ip}`, 10, 5 * 60_000)
+      : await checkRateLimit(`signup:${ip}`, 5, 60 * 60_000)
+  return allowed
+}
+
 export async function signup(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  if (!(await authRateLimit('signup'))) return { error: RATE_LIMITED }
+
   const username = (formData.get('username') as string ?? '').trim()
   const password = formData.get('password') as string ?? ''
   const confirm = formData.get('confirm') as string ?? ''
@@ -53,6 +69,8 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
 }
 
 export async function login(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  if (!(await authRateLimit('login'))) return { error: RATE_LIMITED }
+
   const username = (formData.get('username') as string ?? '').trim()
   const password = formData.get('password') as string ?? ''
 
