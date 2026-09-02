@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['*.janeway.replit.dev'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.ebayimg.com' },

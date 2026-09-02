@@ -8,16 +8,10 @@ run = ["sh", "-c", "npm run build && npm run start"]
 deploymentTarget = "cloudrun"
 
 [[ports]]
-localPort = 3000
-externalPort = 80
-
-[[ports]]
 localPort = 5000
 externalPort = 80
 
 [env]
-PORT = "3000"
-NODE_ENV = "production"
 
 [agent]
 expertMode = true

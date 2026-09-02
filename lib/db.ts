@@ -102,4 +102,29 @@ export async function runMigrations() {
       updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      username      TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx
+    ON users (LOWER(username))
+  `
+
+  await sql`
+    ALTER TABLE scans
+    ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)
+  `
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS scans_user_id_idx
+    ON scans (user_id, created_at DESC)
+    WHERE user_id IS NOT NULL
+  `
 }

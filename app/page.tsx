@@ -1,5 +1,7 @@
 import { Scanner } from '@/components/Scanner'
 import { StoreCheckIn } from '@/components/StoreCheckIn'
+import { UserMenu } from '@/components/UserMenu'
+import { getSession } from '@/lib/auth'
 import { IconSearch, IconBarChart, IconDollar, IconClipboard, IconCamera, IconClock } from '@/components/icons'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
@@ -11,10 +13,19 @@ const FEATURES: { icon: ReactNode; label: string }[] = [
   { icon: <IconClipboard size={12} strokeWidth={2} />, label: 'Sell Tips' },
 ]
 
-export default function Home() {
+export default async function Home() {
+  const session = await getSession()
+
   return (
     <main className="min-h-screen text-white">
       <div className="max-w-md mx-auto px-4 pt-10 pb-28">
+
+        {/* User menu */}
+        {session && (
+          <div className="flex justify-end mb-2">
+            <UserMenu username={session.username} />
+          </div>
+        )}
 
         {/* Header */}
         <div className="text-center mb-10">
@@ -74,14 +85,14 @@ export default function Home() {
             ))}
           </ol>
           <p className="text-slate-500 text-xs mt-4 pt-4 border-t border-slate-700/50">
-            Privacy: no account required, and images are not stored.
+            Privacy: images are not stored on our servers.
           </p>
         </div>
 
         {/* Divider + trust line */}
         <div className="mt-8 pt-6 border-t border-slate-800 text-center">
           <p className="text-slate-600 text-xs">
-            Claude AI · eBay market data · No signup required
+            Claude AI · eBay market data
           </p>
         </div>
 

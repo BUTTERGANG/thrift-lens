@@ -3,11 +3,13 @@ import { createHash } from 'crypto'
 import { identifyItem, analyzeItem } from '@/lib/claude'
 import { fetchEbayComps } from '@/lib/ebay'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { requireSession } from '@/lib/auth'
+import { looksLikeHeic, heicToJpeg } from '@/lib/heic'
 import sql from '@/lib/db'
 import type { EbayComp } from '@/types'
 
-// HEIC/HEIF are excluded: Anthropic Vision only accepts jpeg/png/gif/webp.
-// iPhone users should enable Settings > Camera > Formats > Most Compatible.
+// Anthropic Vision accepts only jpeg/png/gif/webp. HEIC/HEIF is converted to
+// JPEG server-side (lib/heic.ts) — the browser converts first when it can.
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
@@ -17,7 +19,6 @@ const ALLOWED_MIME_TYPES = new Set([
 ])
 
 const HEIC_TYPES = new Set(['image/heic', 'image/heif'])
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
@@ -36,9 +37,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const session = await requireSession()
+
     const formData = await request.formData()
     const imageFile = formData.get('image') as File | null
-    const sessionId = formData.get('session_id') as string | null
     const storeName = (formData.get('store_name') as string | null) || null
     const latitude = formData.get('latitude') ? parseFloat(formData.get('latitude') as string) : null
     const longitude = formData.get('longitude') ? parseFloat(formData.get('longitude') as string) : null
@@ -46,21 +48,32 @@ export async function POST(request: NextRequest) {
     if (!imageFile) {
       return Response.json({ error: 'No image provided' }, { status: 400 })
     }
-    if (!sessionId) {
-      return Response.json({ error: 'No session_id provided' }, { status: 400 })
-    }
-    if (!UUID_REGEX.test(sessionId)) {
-      return Response.json({ error: 'Invalid session_id' }, { status: 400 })
+
+    if (imageFile.size > MAX_IMAGE_BYTES) {
+      return Response.json({ error: 'Image too large. Max 10MB.' }, { status: 413 })
     }
 
-    // Server-side MIME type validation
-    const mediaType = imageFile.type || 'image/jpeg'
-    if (HEIC_TYPES.has(mediaType)) {
-      return Response.json(
-        { error: 'HEIC photos aren\'t supported. On your iPhone, go to Settings → Camera → Formats and choose "Most Compatible", then retake the photo.' },
-        { status: 415 }
-      )
+    let mediaType = imageFile.type || 'image/jpeg'
+    let bytes = new Uint8Array(await imageFile.arrayBuffer())
+
+    // HEIC → JPEG. Trust the header sniff over the MIME type: desktop browsers
+    // often send a .heic with no/octet-stream type.
+    if (HEIC_TYPES.has(mediaType) || looksLikeHeic(bytes)) {
+      try {
+        bytes = await heicToJpeg(bytes)
+        mediaType = 'image/jpeg'
+      } catch (err) {
+        console.error('HEIC conversion failed:', err instanceof Error ? err.stack : err)
+        return Response.json(
+          {
+            error:
+              "We couldn't convert that HEIC photo. On your iPhone, Settings → Camera → Formats → \"Most Compatible\" makes new photos upload as JPEG.",
+          },
+          { status: 415 }
+        )
+      }
     }
+
     if (!ALLOWED_MIME_TYPES.has(mediaType)) {
       return Response.json(
         { error: 'Invalid file type. Please upload a JPEG, PNG, or WebP image.' },
@@ -68,14 +81,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (imageFile.size > MAX_IMAGE_BYTES) {
-      return Response.json({ error: 'Image too large. Max 10MB.' }, { status: 413 })
-    }
-
-    // Convert image to base64
-    const arrayBuffer = await imageFile.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    const imageBase64 = buffer.toString('base64')
+    const imageBase64 = Buffer.from(bytes).toString('base64')
 
     // Step 1: Identify item with Claude Vision
     const identification = await identifyItem(imageBase64, mediaType)
@@ -130,13 +136,14 @@ export async function POST(request: NextRequest) {
     try {
       const inserted = await sql`
         INSERT INTO scans (
-          session_id, item_identified, brand, condition, deal_score,
+          session_id, user_id, item_identified, brand, condition, deal_score,
           market_value_low, market_value_high, profit_estimate,
           profit_estimate_low, profit_estimate_high,
           identification_json, analysis_json, ebay_comps_json,
           store_name, latitude, longitude
         ) VALUES (
-          ${sessionId}::uuid,
+          ${session.userId}::uuid,
+          ${session.userId}::uuid,
           ${identification.item_name},
           ${identification.brand},
           ${identification.condition},
@@ -171,9 +178,16 @@ export async function POST(request: NextRequest) {
       comps,
     })
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'Scan failed'
+    if (message === 'Not authenticated') {
+      return Response.json({ error: 'Not authenticated' }, { status: 401 })
+    }
     console.error('Scan error:', err)
+    // Only forward messages that were written for end users (lib/claude.ts).
+    // Anything else may leak internal details, so return a generic message.
+    const safe = /^(The item analysis|The analysis took too long|AI returned)/.test(message)
     return Response.json(
-      { error: err instanceof Error ? err.message : 'Scan failed' },
+      { error: safe ? message : 'Something went wrong while analyzing this item. Please try again.' },
       { status: 500 }
     )
   }

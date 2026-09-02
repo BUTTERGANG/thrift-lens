@@ -2,14 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getOrCreateSessionId } from '@/lib/session'
 import { getCheckIn } from '@/lib/location'
+import { isHeic, toUploadableImage } from '@/lib/image'
 import { IconCamera, IconGallery, IconArrowRight, IconCheck, IconWarning } from '@/components/icons'
 
 const STEPS = ['Identify', 'Comps', 'Analysis']
 
 export function Scanner() {
-  const inputRef = useRef<HTMLInputElement>(null)
+  // Two separate inputs: iOS Safari only offers the camera when `capture` is a
+  // real attribute at parse time (toggling it via setAttribute is unreliable),
+  // and it needs `accept="image/*"` rather than an explicit type list.
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const libraryInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const [preview, setPreview] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -23,37 +27,54 @@ export function Scanner() {
     }
   }, [preview])
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    const isImage = f.type.startsWith('image/')
-    const isHeic = /\.(heic|heif)$/i.test(f.name)
-    if (!isImage && !isHeic) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files?.[0]
+    if (!picked) return
+    if (!picked.type.startsWith('image/') && !isHeic(picked)) {
       setError('Please select an image file.')
       return
     }
+
+    setError(null)
+
+    // Try to convert HEIC → JPEG and downscale big camera photos in the browser
+    // (fast, hardware-decoded on iOS/Safari). If the browser can't decode it
+    // — HEIC on desktop Chrome/Firefox — fall through with the original file
+    // and let the server convert it.
+    let f = picked
+    try {
+      f = await toUploadableImage(picked)
+    } catch {
+      // Browser couldn't decode it (HEIC on Chrome/Firefox, or an odd format).
+      // Send the original through — the server sniffs the header and converts
+      // HEIC there, and rejects anything it genuinely can't use.
+      f = picked
+    }
+
     if (f.size > 10 * 1024 * 1024) {
       setError('Image too large. Max 10MB.')
       return
     }
-    setError(null)
+
     setFile(f)
     if (preview) URL.revokeObjectURL(preview)
-    setPreview(URL.createObjectURL(f))
+    // A still-HEIC file won't render in <img> on non-Safari browsers; skip the
+    // object URL so the preview falls back to the "photo selected" card.
+    setPreview(isHeic(f) ? null : URL.createObjectURL(f))
   }
 
   function openCamera() {
-    if (!inputRef.current) return
-    inputRef.current.setAttribute('capture', 'environment')
-    inputRef.current.value = ''
-    inputRef.current.click()
+    const el = cameraInputRef.current
+    if (!el) return
+    el.value = ''
+    el.click()
   }
 
   function openLibrary() {
-    if (!inputRef.current) return
-    inputRef.current.removeAttribute('capture')
-    inputRef.current.value = ''
-    inputRef.current.click()
+    const el = libraryInputRef.current
+    if (!el) return
+    el.value = ''
+    el.click()
   }
 
   function reset() {
@@ -74,10 +95,8 @@ export function Scanner() {
     }, 6000)
 
     try {
-      const sessionId = getOrCreateSessionId()
       const formData = new FormData()
       formData.append('image', file)
-      formData.append('session_id', sessionId)
 
       const checkin = getCheckIn()
       if (checkin) {
@@ -100,32 +119,51 @@ export function Scanner() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
-      setLoading(false)
     } finally {
       clearInterval(interval)
+      setLoading(false)
     }
   }
 
   return (
     <div className="flex flex-col gap-3">
       <input
-        ref={inputRef}
+        ref={cameraInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+        accept="image/*"
+        capture="environment"
         onChange={handleFileChange}
         className="hidden"
-        aria-label="Select image"
+        aria-label="Take a photo"
+      />
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+        aria-label="Choose an image from your library"
       />
 
       {/* Preview / drop zone */}
-      {preview ? (
+      {file ? (
         <div className="rounded-2xl overflow-hidden bg-slate-800 border border-slate-700/40">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt="Selected item"
-            className="w-full object-cover max-h-72"
-          />
+          {preview ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={preview}
+              alt="Selected item"
+              className="w-full object-cover max-h-72"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <IconCheck size={28} strokeWidth={2.5} className="text-green-400" />
+              <p className="text-slate-200 text-sm font-semibold">Photo selected</p>
+              <p className="text-slate-500 text-xs px-6">
+                HEIC preview isn&apos;t supported in this browser — it&apos;ll be converted when you scan.
+              </p>
+            </div>
+          )}
           {!loading && (
             <div className="flex gap-2 p-3 bg-slate-900/70">
               <button
@@ -159,7 +197,7 @@ export function Scanner() {
       )}
 
       {/* Action buttons */}
-      {!loading && !preview && (
+      {!loading && !file && (
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
             <button

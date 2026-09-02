@@ -15,7 +15,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'ThriftLens — Resale Price Scanner',
   description: 'Snap a photo of any thrift store item and get instant resale value + profit estimate',
-  manifest: '/manifest.json',
+  manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

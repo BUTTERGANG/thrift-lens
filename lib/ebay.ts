@@ -95,10 +95,12 @@ function mapEbayItems(items: Array<Record<string, unknown>>): EbayComp[] {
 }
 
 async function fetchBrowse(query: string, limit: number, token: string) {
+  // No `sort` param → eBay Best Match, which surfaces the most representative
+  // listings for price comparison (newlyListed just returns the freshest, not
+  // the most relevant). FIXED_PRICE only, since auction prices aren't comps.
   const params = new URLSearchParams({
     q: query,
     limit: String(limit),
-    sort: 'newlyListed',
     filter: 'buyingOptions:{FIXED_PRICE}',
   })
 

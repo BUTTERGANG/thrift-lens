@@ -22,10 +22,10 @@ ThriftLens is a mobile-first PWA that lets resellers photograph thrift store ite
 - **Deal score** — HOT / GOOD / PASS verdict in under 20 seconds
 - **Selling tips** — best platforms, listing keywords, authenticity warnings
 - **eBay comps** — live active listings for price reference
-- **Scan history** — all past scans stored per session
+- **Scan history** — all past scans stored per user account
 
 **UI/UX highlights (current):**
-- **How it works onboarding** — 3-step explainer + privacy note (no account, no image storage)
+- **How it works onboarding** — 3-step explainer + privacy note (no image storage)
 - **Scan flow polish** — clear camera vs library actions, image preview, retake/choose different
 - **Processing stepper** — Identify → Comps → Analysis with ETA hint
 - **Results clarity** — active listings explained + confidence meaning
@@ -44,11 +44,13 @@ ThriftLens is a mobile-first PWA that lets resellers photograph thrift store ite
 ```
 User (iPhone Safari)
   │
-  │  Photo upload (FormData)
-  ▼
-POST /api/scan
+  │  /login → signup or login → JWT session cookie set
   │
-  ├─ 1. Claude Sonnet 4.6 (Vision)
+  │  Photo upload (FormData) + session cookie
+  ▼
+POST /api/scan  (proxy.ts verifies JWT)
+  │
+  ├─ 1. Claude Sonnet 5 (Vision)
   │       Image → IdentificationResult
   │       { item_name, brand, condition, ebay_search_query, ... }
   │
@@ -59,7 +61,7 @@ POST /api/scan
   │       Active listings → EbayComp[]
   │       Cached for 24 hours
   │
-  ├─ 4. Claude Sonnet 4.6 (Text only — no image re-sent, cheaper)
+  ├─ 4. Claude Sonnet 5 (Text only — no image re-sent, cheaper)
   │       Identification + Comps → AnalysisResult
   │       { deal_score, market_value, profit_estimate, tips, ... }
   │
@@ -74,31 +76,40 @@ POST /api/scan
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | Framework | Next.js 16 (App Router) | API routes + server components in one project, easy Replit deploy |
-| AI — Vision | Claude Sonnet 4.6 | Best-in-class image understanding for item identification |
-| AI — Analysis | Claude Sonnet 4.6 (text) | Same model, text-only call = ~10x cheaper than vision |
+| AI — Vision | Claude Sonnet 5 | Best-in-class image understanding for item identification |
+| AI — Analysis | Claude Sonnet 5 (text) | Same model, text-only call = ~10x cheaper than vision |
 | Database | NeonDB (PostgreSQL) | Serverless Postgres, HTTP transport works reliably on Replit |
 | Market Data | eBay Browse API | Official API, 5,000 free calls/day, OAuth client credentials |
 | Styling | Tailwind CSS v4 | Utility-first, dark mobile UI |
 | PWA | Native SW + manifest | Installable on iPhone, service worker for offline |
-| Auth | None (beta) | UUID session in localStorage |
+| Auth | Username/password + JWT | scrypt-hashed passwords, HttpOnly session cookies |
 
 ### Directory Structure
 
 ```
 thrift-lens/
+├── proxy.ts                    # Route protection (redirects unauthenticated → /login)
 ├── app/
 │   ├── layout.tsx              # Root layout: fonts, PWA meta, service worker
-│   ├── page.tsx                # Home: camera UI + bottom nav
+│   ├── page.tsx                # Home: camera UI + user menu + bottom nav
 │   ├── manifest.ts             # PWA manifest (App Router native)
+│   ├── login/
+│   │   └── page.tsx            # Login / signup form (client component)
+│   ├── actions/
+│   │   └── auth.ts             # Server actions: signup, login, logout
 │   ├── history/
 │   │   └── page.tsx            # Scan history (client component)
 │   ├── results/
-│   │   └── [id]/
-│   │       └── page.tsx        # Results display (server component)
+│   │   ├── [id]/
+│   │   │   └── page.tsx        # Results display (server component, ownership-scoped)
+│   │   └── preview/
+│   │       └── page.tsx        # Preview (sessionStorage, not DB-saved)
 │   └── api/
-│       ├── scan/route.ts       # POST — main analysis pipeline
+│       ├── scan/route.ts       # POST — main analysis pipeline (authenticated)
+│       ├── scan/[id]/feedback/route.ts  # PATCH — user feedback (ownership-checked)
 │       ├── ebay/route.ts       # GET  — eBay comps debug endpoint
-│       ├── history/route.ts    # GET  — paginated scan history
+│       ├── ebay/account-deletion/route.ts  # GET/POST — eBay GDPR endpoint
+│       ├── history/route.ts    # GET  — paginated scan history (authenticated)
 │       └── migrate/route.ts    # POST — DB schema initialization
 │
 ├── components/
@@ -108,13 +119,15 @@ thrift-lens/
 │   ├── PriceRange.tsx          # Market value + profit display
 │   ├── CompsList.tsx           # eBay listings table
 │   ├── TipsList.tsx            # Platforms, tips, keywords, warnings
+│   ├── UserMenu.tsx            # Username display + logout button
 │   └── ServiceWorkerRegistrar.tsx
 │
 ├── lib/
+│   ├── auth.ts                 # JWT session management (encrypt/decrypt/create/delete/get)
+│   ├── password.ts             # scrypt password hashing + timing-safe verification
 │   ├── claude.ts               # Anthropic client, both prompts, JSON parser
 │   ├── ebay.ts                 # eBay OAuth token cache + Browse API client
-│   ├── db.ts                   # NeonDB client + runMigrations()
-│   └── session.ts              # localStorage UUID session helper
+│   └── db.ts                   # NeonDB client + runMigrations()
 │
 ├── types/
 │   └── index.ts                # IdentificationResult, AnalysisResult, EbayComp, ScanRecord, ScanResponse
@@ -155,7 +168,16 @@ The app currently uses the **Browse API (active listings)** as a market signal p
 All prices are stored as **integer cents** (e.g. $25.00 = `2500`) to avoid floating point issues.
 
 ```sql
--- Session tracking (no auth in beta — UUID from localStorage)
+-- User accounts (username/password auth)
+CREATE TABLE users (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username      TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,              -- scrypt hash (salt:key hex format)
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX users_username_lower_idx ON users (LOWER(username));
+
+-- Session tracking (legacy — kept for backward compat)
 CREATE TABLE sessions (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -165,7 +187,8 @@ CREATE TABLE sessions (
 CREATE TABLE scans (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id          UUID NOT NULL,
-  image_url           TEXT,                    -- NULL in beta (no image persistence)
+  user_id             UUID REFERENCES users(id),  -- set on all new scans
+  image_url           TEXT,                    -- NULL (no image persistence)
   item_identified     TEXT NOT NULL,           -- e.g. "Vintage Levi's 501 Jeans"
   brand               TEXT,
   condition           TEXT,
@@ -173,12 +196,22 @@ CREATE TABLE scans (
   market_value_low    INTEGER,                 -- cents
   market_value_high   INTEGER,                 -- cents
   profit_estimate     INTEGER,                 -- cents (midpoint of low/high)
+  profit_estimate_low INTEGER,                 -- cents
+  profit_estimate_high INTEGER,                -- cents
   identification_json JSONB,                   -- full IdentificationResult from Claude
   analysis_json       JSONB NOT NULL,          -- full AnalysisResult from Claude
   ebay_comps_json     JSONB,                   -- raw EbayComp[] array
+  store_name          TEXT,                    -- optional check-in store name
+  latitude            DOUBLE PRECISION,
+  longitude           DOUBLE PRECISION,
+  bought              BOOLEAN,                 -- user feedback: did they buy it?
+  buy_price_cents     INTEGER,                 -- what they paid
+  identification_correct BOOLEAN,              -- user feedback: was ID right?
+  actual_item_override TEXT,                   -- user correction if ID was wrong
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX scans_session_id_idx ON scans (session_id, created_at DESC);
+CREATE INDEX scans_user_id_idx ON scans (user_id, created_at DESC) WHERE user_id IS NOT NULL;
 
 -- 24-hour eBay comps cache (avoids re-fetching same item)
 CREATE TABLE comps_cache (
@@ -212,13 +245,17 @@ curl -X POST https://your-app.replit.app/api/migrate \
 
 ### `POST /api/scan`
 
-Main analysis pipeline. Accepts a photo, returns full deal analysis.
+Main analysis pipeline. Accepts a photo, returns full deal analysis. **Requires authentication** (session cookie).
 
 **Request:** `multipart/form-data`
 | Field | Type | Required |
 |-------|------|----------|
-| `image` | File (JPEG/PNG/WEBP/HEIC) | Yes |
-| `session_id` | UUID string | Yes |
+| `image` | File (JPEG/PNG/WEBP) | Yes |
+| `store_name` | string | No |
+| `latitude` | number | No |
+| `longitude` | number | No |
+
+**Auth:** Session cookie (HttpOnly JWT) — set automatically on login/signup.
 
 **Response:** `200 OK`
 ```json
@@ -234,7 +271,10 @@ Main analysis pipeline. Accepts a photo, returns full deal analysis.
 ```
 
 **Errors:**
-- `400` — Missing image or session_id
+- `400` — Missing image
+- `401` — Not authenticated
+- `415` — Unsupported file type (HEIC not supported)
+- `429` — Rate limited (5 scans/min per IP)
 - `500` — Claude API failure or unexpected error
 
 ---
@@ -267,16 +307,17 @@ Fetch eBay active listings directly. Useful for debugging.
 
 ---
 
-### `GET /api/history?session_id={uuid}&limit=20&offset=0`
+### `GET /api/history?limit=20&offset=0`
 
-Returns paginated scan history for a session.
+Returns paginated scan history for the authenticated user.
+
+**Auth:** Session cookie (HttpOnly JWT).
 
 **Parameters:**
 | Param | Default | Max |
 |-------|---------|-----|
-| `session_id` | required | — |
 | `limit` | 20 | 50 |
-| `offset` | 0 | — |
+| `offset` | 0 | 1000 |
 
 **Response:**
 ```json
@@ -289,11 +330,32 @@ Returns paginated scan history for a session.
       "deal_score": "GOOD",
       "market_value_low": 4500,
       "market_value_high": 8000,
-      "created_at": "2025-03-19T12:00:00Z"
+      "store_name": "Goodwill",
+      "created_at": "2026-03-19T12:00:00Z"
     }
   ]
 }
 ```
+
+---
+
+### `PATCH /api/scan/[id]/feedback`
+
+Record user feedback on a scan. **Ownership-checked** — users can only update their own scans.
+
+**Auth:** Session cookie (HttpOnly JWT).
+
+**Request:**
+```json
+{
+  "bought": true,
+  "buy_price_cents": 499,
+  "identification_correct": true,
+  "actual_item_override": null
+}
+```
+
+**Response:** `{ "ok": true }`
 
 ---
 
@@ -432,7 +494,6 @@ Open app → Capture/Upload → Results → Decide buy/sell → Saved in history
 - **Reliability/UX**: friendly errors, file validation, clear “no comps” messaging.
 
 **Non‑Goals (Out of scope for MVP)**
-- User accounts or auth
 - Sold‑listing data / Terapeak
 - Multi‑image scans
 - Advanced ROI tooling (buy price input, break‑even)
@@ -457,7 +518,7 @@ Open app → Capture/Upload → Results → Decide buy/sell → Saved in history
 - % of scans with eBay comps returned
 - Average scan latency (target: <25 seconds)
 - Deal score distribution (HOT / GOOD / PASS ratio)
-- Returning sessions (same UUID across days)
+- Returning users (same account across days)
 - Buy rate on HOT scores (Phase 2: "did you buy it?" tap)
 - Estimate accuracy (Phase 2: compare Claude price vs actual sold price)
 
@@ -469,7 +530,7 @@ Open app → Capture/Upload → Results → Decide buy/sell → Saved in history
 
 _Post‑MVP expansion is captured in Phase 2/3 below._
 
-### What's Built (v0.1 — Current State)
+### What's Built (v0.2 — Current State)
 
 - [x] Photo capture on iPhone (camera + library)
 - [x] Scan flow polish (preview, retake, clear actions)
@@ -480,18 +541,24 @@ _Post‑MVP expansion is captured in Phase 2/3 below._
 - [x] Claude profit analysis (deal score, price range, tips)
 - [x] Results clarity (active listings + confidence explanation)
 - [x] Results page (server component, SEO-friendly URL)
-- [x] Scan history per session + client-side filters
+- [x] Scan history per user account + client-side filters
 - [x] PWA manifest + service worker (installable on iPhone)
 - [x] DB schema with full data persistence
 - [x] `.replit` config for Replit deployment
-- [x] TypeScript build error fixed (`lib/ebay.ts` type guard)
+- [x] **User authentication** (username/password signup + login)
+- [x] **Secure session management** (JWT in HttpOnly cookies, 7-day expiry)
+- [x] **Password security** (scrypt hashing, timing-safe comparison, random salts)
+- [x] **Route protection** (proxy.ts blocks unauthenticated access)
+- [x] **Scan ownership** (users can only view/edit their own scans)
+- [x] **eBay account deletion endpoint** (GDPR compliance for eBay API)
 
 ### Phase 1 — Replit Deploy & First Field Test
 
 **Must have before first Goodwill test:**
-- [ ] Add Replit Secrets (ANTHROPIC_API_KEY, EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, DATABASE_URL, MIGRATE_SECRET)
+- [ ] Add Replit Secrets (ANTHROPIC_API_KEY, EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, DATABASE_URL, SESSION_SECRET, MIGRATE_SECRET, ENABLE_MIGRATE_ENDPOINT)
 - [ ] Create NeonDB project at neon.tech, grab pooled connection string
-- [ ] Run DB migration (`POST /api/migrate`) after first deploy
+- [ ] Run DB migration (`POST /api/migrate`) after first deploy — creates users, scans, cache, rate_limits tables
+- [ ] Create a user account via the /login signup form
 - [ ] Test full scan flow on iPhone Safari (camera + library paths)
 - [ ] Test "Add to Home Screen" — verify PWA installs correctly
 
@@ -556,7 +623,7 @@ _Post‑MVP expansion is captured in Phase 2/3 below._
 
 **Monetisation (if applicable):**
 - [ ] Scan limits on free tier (e.g. 10/day free, unlimited paid)
-- [ ] User accounts (replace localStorage UUID with real auth via Clerk or NextAuth)
+- [x] ~~User accounts~~ — implemented (username/password with JWT sessions)
 - [ ] Subscription billing (Stripe)
 
 **Distribution:**
@@ -567,7 +634,7 @@ _Post‑MVP expansion is captured in Phase 2/3 below._
 
 | Component | Cost | Notes |
 |-----------|------|-------|
-| Claude Vision (Step 1) | ~$0.004 | ~1,000 image tokens @ claude-sonnet-4-6 pricing |
+| Claude Vision (Step 1) | ~$0.003 | ~1,000 image tokens @ claude-sonnet-5 pricing ($2 / 1M in, $10 / 1M out) |
 | Claude Text (Step 2) | ~$0.001 | Text-only, ~500 tokens |
 | eBay API | $0.00 | Free tier: 5,000 calls/day |
 | NeonDB | ~$0.00 | Free tier covers ~3GB storage |
@@ -588,14 +655,16 @@ ANTHROPIC_API_KEY=       # console.anthropic.com
 EBAY_CLIENT_ID=          # developer.ebay.com → Your Apps → OAuth credentials
 EBAY_CLIENT_SECRET=      # Same location as Client ID
 DATABASE_URL=            # NeonDB → Project → Connection string (use POOLED)
+SESSION_SECRET=          # Random 32+ char string for signing JWT sessions
 MIGRATE_SECRET=          # Any random string, used to protect /api/migrate
+ENABLE_MIGRATE_ENDPOINT= # Set to "true" to enable /api/migrate
 ```
 
 ### Getting API Keys
 
 **Anthropic:**
 1. `console.anthropic.com` → API Keys → Create key
-2. Minimum $5 credit needed to use claude-sonnet-4-6
+2. Minimum $5 credit needed to use claude-sonnet-5
 
 **eBay:**
 1. `developer.ebay.com` → My Account → Application Keys
@@ -603,11 +672,17 @@ MIGRATE_SECRET=          # Any random string, used to protect /api/migrate
 3. Under Auth Tokens → OAuth Client Credentials
 4. Scope needed: `https://api.ebay.com/oauth/api_scope` (read-only public)
 5. Rate limit: 5,000 Browse API calls/day (free)
+6. **Account Deletion Notification:** set endpoint URL to `https://your-app.replit.app/api/ebay/account-deletion` and set a verification token matching `EBAY_VERIFICATION_TOKEN` in your env
 
 **NeonDB:**
 1. `neon.tech` → Create project → Connection Details
 2. Copy the **Pooled** connection string (contains `-pooler` in hostname)
 3. Do NOT use the direct connection string — exhausts connections on Replit
+
+**Session Secret:**
+1. Generate with `openssl rand -base64 32`
+2. Add as `SESSION_SECRET` in Replit Secrets
+3. Required in production — a dev fallback is used locally
 
 ---
 
@@ -629,15 +704,17 @@ npm run build
 # 2. Start the server
 npm start
 
-# 3. Run migrations (once only)
+# 3. Run migrations (once only — creates users table, scans, cache, etc.)
 curl -X POST https://your-replit-url.replit.app/api/migrate \
   -H "Content-Type: application/json" \
   -d '{"secret":"your_migrate_secret"}'
 
-# 4. Test eBay connection
-curl "https://your-replit-url.replit.app/api/ebay?q=levi+501+jeans"
+# 4. Open /login → create an account → verify redirect to home
 
-# 5. Open on iPhone Safari → test scan flow → Add to Home Screen
+# 5. Test eBay connection (requires auth cookie — use browser)
+# Navigate to: https://your-replit-url.replit.app/api/ebay?q=levi+501+jeans
+
+# 6. Open on iPhone Safari → test scan flow → Add to Home Screen
 ```
 
 ### Known Replit Gotchas
@@ -661,4 +738,4 @@ The PWA covers the iPhone use case for beta. When ready to go native:
 
 ---
 
-*Last updated: March 2026 · v0.1 deployed to Replit · Built with Next.js 16 + Claude Sonnet 4.6 + NeonDB*
+*Last updated: September 2026 · v0.2 with auth · Built with Next.js 16 + Claude Sonnet 5 + NeonDB*

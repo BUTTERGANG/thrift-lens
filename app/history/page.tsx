@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { getOrCreateSessionId } from '@/lib/session'
 import { DealScore } from '@/components/DealScore'
 import { IconCamera, IconClock, IconPin, IconInbox, IconWarning } from '@/components/icons'
 
@@ -59,15 +58,9 @@ export default function HistoryPage() {
   const [recencyFilter, setRecencyFilter] = useState<RecencyFilter>('all')
 
   const fetchScans = useCallback(async (currentOffset: number, append: boolean) => {
-    const sessionId = getOrCreateSessionId()
-    if (!sessionId) {
-      setLoading(false)
-      return
-    }
-
     try {
       const res = await fetch(
-        `/api/history?session_id=${sessionId}&limit=${PAGE_SIZE}&offset=${currentOffset}`
+        `/api/history?limit=${PAGE_SIZE}&offset=${currentOffset}`
       )
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()

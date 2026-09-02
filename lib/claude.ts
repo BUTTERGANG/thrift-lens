@@ -1,8 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { IdentificationResult, AnalysisResult, EbayComp } from '@/types'
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'claude-sonnet-5'
 const TIMEOUT_MS = 45_000
+
+// Both calls want fast, deterministic JSON. On Sonnet 5, omitting `thinking`
+// runs adaptive thinking by default — disable it explicitly to keep latency
+// and token cost down (matches the previous Sonnet 4.6 behaviour).
+const THINKING_OFF = { type: 'disabled' } as const
 
 // Lazy init — avoid throwing during Next.js build with placeholder env vars.
 let _client: Anthropic | null = null
@@ -17,11 +22,29 @@ function getClient(): Anthropic {
   return _client
 }
 
+/** Message shown to the user for any failure that isn't already user-safe. */
+const GENERIC_AI_ERROR = 'The item analysis service is temporarily unavailable. Please try again in a moment.'
+
 async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
     return await fn(controller.signal)
+  } catch (err) {
+    // parseJSON already throws a user-facing message — let that through.
+    if (err instanceof Error && err.message.startsWith('AI returned')) {
+      throw err
+    }
+    if (err instanceof Anthropic.APIError) {
+      // Never surface raw API errors (billing, rate limits, keys) to the client.
+      console.error('Anthropic API error:', err.status, err.message)
+      throw new Error(GENERIC_AI_ERROR)
+    }
+    if (err instanceof Error && (err.name === 'AbortError' || controller.signal.aborted)) {
+      throw new Error('The analysis took too long and timed out. Please try again.')
+    }
+    console.error('Claude call failed:', err)
+    throw new Error(GENERIC_AI_ERROR)
   } finally {
     clearTimeout(timer)
   }
@@ -51,6 +74,7 @@ export async function identifyItem(
       {
         model: MODEL,
         max_tokens: 1024,
+        thinking: THINKING_OFF,
         system: IDENTIFICATION_SYSTEM,
         messages: [
           {
@@ -116,6 +140,7 @@ export async function analyzeItem(
       {
         model: MODEL,
         max_tokens: 2048,
+        thinking: THINKING_OFF,
         system: ANALYSIS_SYSTEM,
         messages: [
           {

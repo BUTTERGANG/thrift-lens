@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import sql from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { ResultCard } from '@/components/ResultCard'
 import { FeedbackTap } from '@/components/FeedbackTap'
 import { IconArrowLeft, IconCamera, IconClock } from '@/components/icons'
@@ -12,9 +13,10 @@ export default async function ResultsPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const session = await requireSession()
 
   const rows = await sql`
-    SELECT * FROM scans WHERE id = ${id}::uuid LIMIT 1
+    SELECT * FROM scans WHERE id = ${id}::uuid AND user_id = ${session.userId}::uuid LIMIT 1
   `
 
   if (rows.length === 0) notFound()

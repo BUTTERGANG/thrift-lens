@@ -1,9 +1,12 @@
-const CACHE_NAME = 'thriftlens-v2'
-const PRECACHE = ['/', '/manifest.json']
+const CACHE_NAME = 'thriftlens-v4'
+const PRECACHE = ['/', '/manifest.webmanifest']
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE))
+    caches.open(CACHE_NAME).then((cache) =>
+      // Don't let one failed entry abort the whole install (addAll is atomic).
+      Promise.allSettled(PRECACHE.map((url) => cache.add(url)))
+    )
   )
   self.skipWaiting()
 })
