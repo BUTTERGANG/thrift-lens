@@ -8,40 +8,9 @@ run = ["sh", "-c", "npm run build && npm run start"]
 deploymentTarget = "cloudrun"
 
 [[ports]]
-localPort = 5000
+localPort = 3000
 externalPort = 80
 
 [env]
-<<<<<<< HEAD
-
-[agent]
-expertMode = true
-
-[workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
-=======
-CLAUDE_CONFIG_DIR = "/home/runner/workspace/.local/state/claude"
 PORT = "3000"
 NODE_ENV = "production"
->>>>>>> 0d96b7a2205ebc8cfe5df16e72488cca61ebfba7
