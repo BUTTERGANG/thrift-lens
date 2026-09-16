@@ -3,7 +3,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { DealScore } from '@/components/DealScore'
-import { IconCamera, IconClock, IconPin, IconInbox, IconWarning } from '@/components/icons'
+import { AppNav } from '@/components/AppNav'
+import { getThumbs } from '@/lib/thumbstore'
+import { IconPin, IconInbox, IconWarning } from '@/components/icons'
 
 interface HistoryItem {
   id: string
@@ -95,9 +97,12 @@ export default function HistoryPage() {
     return now - createdAt <= days * 24 * 60 * 60 * 1000
   })
 
+  // Captured-photo thumbnails carried in-session (never uploaded for cards).
+  const thumbs = getThumbs()
+
   return (
     <main className="min-h-screen text-white">
-      <div className="max-w-md mx-auto px-4 pt-10 pb-28">
+      <div className="max-w-md lg:max-w-2xl xl:max-w-3xl mx-auto px-4 pt-10 lg:pt-24 pb-32 lg:pb-12">
 
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -212,6 +217,14 @@ export default function HistoryPage() {
                   href={`/results/${scan.id}`}
                   className="flex items-center gap-3 bg-gradient-to-r from-slate-800 to-slate-800/80 border border-slate-700/40 hover:border-slate-600/60 rounded-2xl p-4 transition-all duration-150 active:scale-[0.98] shadow-sm"
                 >
+                  {thumbs[scan.id] && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={thumbs[scan.id]}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover border border-slate-600/40 shrink-0"
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-medium leading-snug line-clamp-1">
                       {scan.item_identified}
@@ -255,18 +268,8 @@ export default function HistoryPage() {
 
       </div>
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-800/80 flex" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <Link href="/" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-slate-500">
-          <IconCamera size={20} strokeWidth={1.75} />
-          <span className="text-xs">Scan</span>
-        </Link>
-        <Link href="/history" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-amber-400 relative">
-          <span className="absolute top-2 w-1 h-1 rounded-full bg-amber-400" />
-          <IconClock size={20} strokeWidth={1.75} />
-          <span className="text-xs font-semibold">History</span>
-        </Link>
-      </nav>
+      {/* Responsive nav (bottom on mobile, top bar on desktop) */}
+      <AppNav active="history" />
     </main>
   )
 }

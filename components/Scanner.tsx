@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCheckIn } from '@/lib/location'
-import { isHeic, toUploadableImage } from '@/lib/image'
+import { isHeic, toUploadableImage, makeThumbnailDataUrl } from '@/lib/image'
+import { saveThumb } from '@/lib/thumbstore'
 import { IconCamera, IconGallery, IconArrowRight, IconCheck, IconWarning } from '@/components/icons'
 
 const STEPS = ['Identify', 'Comps', 'Analysis']
@@ -109,6 +110,12 @@ export function Scanner() {
       const data = await res.json()
 
       if (!res.ok) throw new Error(data.error || 'Scan failed')
+
+      // Carry a small in-browser thumbnail of the snapped photo through to the
+      // result/history cards. It never leaves the device, matching the app's
+      // "images are not stored on our servers" privacy line.
+      const thumb = await makeThumbnailDataUrl(file)
+      saveThumb(data.scan_id ?? 'preview', thumb)
 
       sessionStorage.setItem('thriftlens_preview', JSON.stringify(data))
 

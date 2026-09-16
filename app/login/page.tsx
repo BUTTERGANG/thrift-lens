@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useActionState } from 'react'
 import { login, signup, type AuthState } from '@/app/actions/auth'
 import { IconSearch } from '@/components/icons'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -22,6 +23,10 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen text-white flex items-center justify-center px-4">
+      {/* Theme toggle is always reachable on the public login screen too */}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle className="bg-slate-800/70 border border-slate-700/50" />
+      </div>
       <div className="w-full max-w-sm">
 
         {/* Logo */}

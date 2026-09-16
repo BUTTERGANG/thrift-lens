@@ -2,7 +2,8 @@
 
 import { useMemo, useSyncExternalStore } from 'react'
 import Link from 'next/link'
-import { ResultCard } from '@/components/ResultCard'
+import { ResultCardWithThumb } from '@/components/ResultCardWithThumb'
+import { AppNav } from '@/components/AppNav'
 import type { ScanResponse } from '@/types'
 
 export default function PreviewPage() {
@@ -48,7 +49,7 @@ export default function PreviewPage() {
 
   return (
     <main className="min-h-screen bg-slate-900 text-white">
-      <div className="max-w-md mx-auto px-4 pt-5 pb-28">
+      <div className="max-w-md lg:max-w-2xl xl:max-w-3xl mx-auto px-4 pt-5 lg:pt-20 pb-32 lg:pb-12">
         <div className="flex items-center justify-between mb-5">
           <Link href="/" className="text-slate-400 hover:text-white text-sm transition-colors">
             ← New Scan
@@ -58,19 +59,11 @@ export default function PreviewPage() {
           </span>
         </div>
 
-        <ResultCard scan={scan} />
+        <ResultCardWithThumb scan={scan} id={scan.scan_id ? String(scan.scan_id) : 'preview'} />
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-slate-800 flex" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <Link href="/" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-slate-500">
-          <span className="text-lg">📸</span>
-          <span className="text-xs">Scan</span>
-        </Link>
-        <Link href="/history" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-slate-500">
-          <span className="text-lg">🕐</span>
-          <span className="text-xs">History</span>
-        </Link>
-      </nav>
+      {/* Responsive nav (bottom on mobile, top bar on desktop) */}
+      <AppNav active="scan" />
     </main>
   )
 }

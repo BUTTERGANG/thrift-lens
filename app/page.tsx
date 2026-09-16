@@ -1,9 +1,9 @@
 import { Scanner } from '@/components/Scanner'
 import { StoreCheckIn } from '@/components/StoreCheckIn'
 import { UserMenu } from '@/components/UserMenu'
+import { AppNav } from '@/components/AppNav'
 import { getSession } from '@/lib/auth'
-import { IconSearch, IconBarChart, IconDollar, IconClipboard, IconCamera, IconClock } from '@/components/icons'
-import Link from 'next/link'
+import { IconSearch, IconBarChart, IconDollar, IconClipboard } from '@/components/icons'
 import type { ReactNode } from 'react'
 
 const FEATURES: { icon: ReactNode; label: string }[] = [
@@ -18,7 +18,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen text-white">
-      <div className="max-w-md mx-auto px-4 pt-10 pb-28">
+      <div className="max-w-md lg:max-w-2xl xl:max-w-3xl mx-auto px-4 pt-10 lg:pt-24 pb-32 lg:pb-12">
 
         {/* User menu */}
         {session && (
@@ -98,18 +98,8 @@ export default async function Home() {
 
       </div>
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-800/80 flex" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <Link href="/" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-amber-400 relative">
-          <span className="absolute top-2 w-1 h-1 rounded-full bg-amber-400" />
-          <IconCamera size={20} strokeWidth={1.75} />
-          <span className="text-xs font-semibold">Scan</span>
-        </Link>
-        <Link href="/history" className="flex-1 py-4 flex flex-col items-center gap-0.5 text-slate-500">
-          <IconClock size={20} strokeWidth={1.75} />
-          <span className="text-xs">History</span>
-        </Link>
-      </nav>
+      {/* Responsive nav (bottom on mobile, top bar on desktop) */}
+      <AppNav active="scan" />
     </main>
   )
 }

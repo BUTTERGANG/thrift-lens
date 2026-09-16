@@ -12,6 +12,8 @@ import type { ReactNode } from 'react'
 
 interface Props {
   scan: ScanResponse
+  /** Data-URL thumbnail of the captured photo, carried client-side (never uploaded). */
+  thumbnail?: string | null
 }
 
 const CONDITION_LABEL: Record<string, string> = {
@@ -37,7 +39,7 @@ const CATEGORY_ICON: Record<string, ReactNode> = {
 
 const CARD = 'bg-gradient-to-b from-slate-800 to-slate-800/70 border border-slate-700/40 rounded-2xl shadow-[0_1px_3px_rgb(0_0_0/0.4),0_4px_12px_rgb(0_0_0/0.25)]'
 
-export function ResultCard({ scan }: Props) {
+export function ResultCard({ scan, thumbnail }: Props) {
   const { analysis, identification, comps } = scan
 
   const categoryIcon = CATEGORY_ICON[identification.category] ?? CATEGORY_ICON.other
@@ -52,6 +54,14 @@ export function ResultCard({ scan }: Props) {
 
   return (
     <div className="space-y-3">
+
+      {/* Captured-photo thumbnail — carried in-session, never stored on the server */}
+      {thumbnail && (
+        <div className="rounded-2xl overflow-hidden border border-slate-700/40 bg-slate-800/60 shadow-[0_1px_3px_rgb(0_0_0/0.3),0_4px_12px_rgb(0_0_0/0.2)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumbnail} alt={`Photo of ${identification.item_name}`} className="w-full max-h-80 object-cover" />
+        </div>
+      )}
 
       {/* Item header */}
       <div className={`${CARD} p-4`}>

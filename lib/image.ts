@@ -67,3 +67,42 @@ export async function toUploadableImage(file: File): Promise<File> {
     URL.revokeObjectURL(url)
   }
 }
+
+const THUMB_MAX_DIM = 320
+const THUMB_QUALITY = 0.85
+
+/**
+ * Rasterise a File to a small data-URL JPEG thumbnail (≤320px) that the client
+ * can carry into result/history cards entirely in-browser. This is the privacy
+ * story in action: the photo is never uploaded back for thumbnails, so cards can
+ * show what you snapped without the server storing the image.
+ *
+ * Returns null when the browser can't decode the source (e.g. a HEIC on Chrome —
+ * the server converts those, but no thumbnail is possible client-side).
+ */
+export async function makeThumbnailDataUrl(file: File): Promise<string | null> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await loadImage(url)
+    const w = img.naturalWidth
+    const h = img.naturalHeight
+    if (!w || !h) return null
+    const scale = Math.min(1, THUMB_MAX_DIM / Math.max(w, h))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(w * scale))
+    canvas.height = Math.max(1, Math.round(h * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', THUMB_QUALITY)
+    )
+    if (!blob) return null
+    const buf = Buffer.from(await blob.arrayBuffer())
+    return `data:image/jpeg;base64,${buf.toString('base64')}`
+  } catch {
+    return null
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
