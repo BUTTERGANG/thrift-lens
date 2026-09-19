@@ -46,6 +46,20 @@ html[data-theme="light"] .to-slate-800\\/80 { --tw-gradient-to: rgb(255 255 255 
 html[data-theme="light"] .to-slate-800\\/70 { --tw-gradient-to: rgb(255 255 255 / 0.7) !important; }
 html[data-theme="light"] .to-slate-800\\/60 { --tw-gradient-to: rgb(255 255 255 / 0.6) !important; }
 
+/* HOT/GOOD deal badges + status pills (light) */
+html[data-theme="light"] .from-red-950\\/40 { --tw-gradient-from: #fef2f2 !important; }
+html[data-theme="light"] .bg-red-950\\/40 { background-color: #fef2f2 !important; }
+html[data-theme="light"] .border-red-800\\/40 { border-color: rgb(252 165 165 / 0.4) !important; }
+html[data-theme="light"] .border-red-800\\/50 { border-color: rgb(252 165 165 / 0.5) !important; }
+html[data-theme="light"] .from-amber-950\\/30 { --tw-gradient-from: #fffbeb !important; }
+html[data-theme="light"] .border-amber-800\\/30 { border-color: rgb(252 211 77 / 0.3) !important; }
+html[data-theme="light"] .bg-green-900\\/40 { background-color: #f0fdf4 !important; }
+html[data-theme="light"] .border-green-700\\/40 { border-color: rgb(134 239 172 / 0.5) !important; }
+html[data-theme="light"] .bg-amber-900\\/40 { background-color: #fffbeb !important; }
+html[data-theme="light"] .border-amber-700\\/40 { border-color: rgb(252 211 77 / 0.4) !important; }
+html[data-theme="light"] .from-green-900\\/40 { --tw-gradient-from: #f0fdf4 !important; }
+html[data-theme="light"] .to-emerald-900\\/20 { --tw-gradient-to: rgb(236 253 245 / 0.5) !important; }
+
 /* Text (light) */
 html[data-theme="light"] .text-white { color: #0f172a !important; }
 html[data-theme="light"] .text-slate-200 { color: #1e293b !important; }

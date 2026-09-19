@@ -58,7 +58,7 @@ export function TipsList({ tips, platforms, keywords, watchOut }: Props) {
             {keywords.map((k) => (
               <span
                 key={k}
-                className="bg-slate-700/40 border border-slate-600/40 text-slate-300 text-xs px-2.5 py-1 rounded-full font-mono hover:border-amber-500/30 hover:text-amber-200 transition-colors cursor-pointer"
+                className="bg-slate-700/40 border border-slate-600/40 text-slate-300 text-xs px-2.5 py-1 rounded-full font-mono"
               >
                 {k}
               </span>

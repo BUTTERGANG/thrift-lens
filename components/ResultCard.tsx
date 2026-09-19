@@ -123,7 +123,7 @@ export function ResultCard({ scan, thumbnail }: Props) {
       {/* Deal score */}
       <div className={`border rounded-2xl p-5 flex flex-col items-center gap-3 ${dealBg}`}>
         <DealScore score={analysis.deal_score} reason={analysis.deal_score_reason} size="lg" />
-        <p className="text-slate-600 text-xs text-center">
+        <p className="text-slate-400 text-xs text-center">
           Data confidence: <span className="text-slate-500">{analysis.data_confidence}</span>
         </p>
       </div>

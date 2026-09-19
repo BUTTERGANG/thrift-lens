@@ -46,7 +46,7 @@ export function PriceRange({ low, high, profitLow, profitHigh, suggestedList }: 
         </div>
       </div>
 
-      <p className="text-slate-600 text-xs">
+      <p className="text-slate-400 text-xs">
         After ~13% eBay fees + est. shipping
       </p>
     </div>

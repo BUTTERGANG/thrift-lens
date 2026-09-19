@@ -44,7 +44,7 @@ export function CompsList({ comps }: Props) {
         </div>
       )}
 
-      <p className="text-slate-600 text-xs">
+      <p className="text-slate-400 text-xs">
         Active listings show asking prices. Sold data isn&apos;t publicly available via the eBay API.
       </p>
     </div>
